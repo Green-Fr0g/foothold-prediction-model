@@ -6,7 +6,7 @@ import sys
 from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--task", type=str, default="FPM-G1-Validate-FootPred-v0")
+parser.add_argument("--task", type=str, default="FPM-G1-23-Validate-FootPred-v0")
 parser.add_argument("--checkpoint", type=str, required=True)
 parser.add_argument("--num_envs", type=int, default=None)
 parser.add_argument("--num_steps", type=int, default=1100)

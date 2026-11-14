@@ -10,7 +10,7 @@ from isaaclab.assets import Articulation
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor, RayCaster
 
-from ..foot_pred import FootPredictionSupervisor
+from ..foot_pred import FootPredictionSupervisor, load_foot_predictor
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
@@ -39,7 +39,8 @@ def _reload_model(env: ManagerBasedEnv):
     mtime = os.path.getmtime(path)
     if _STATE.model is None or path != _STATE.model_path or mtime > _STATE.model_mtime:
         print(f"[FPM] loading {path}")
-        _STATE.model = torch.jit.load(path, map_location=env.device).eval()
+        state_dim = 12 + 2 * env.scene["robot"].num_joints
+        _STATE.model = load_foot_predictor(path, state_dim, env.device)
         _STATE.model_path = path
         _STATE.model_mtime = mtime
 
@@ -73,6 +74,11 @@ def foothold_scan(
         _STATE.supervisor = FootPredictionSupervisor(env, train=train_fpm, **(fpm_kwargs or {}))
     _STATE.supervisor.pre_step(env)
     _reload_model(env)
+    if force_model and _STATE.model is None:
+        raise FileNotFoundError(
+            "Playback and validation require a trained foot_model_*.pt beside the policy checkpoint. "
+            "Train the selected robot's FPM before playing or validating it."
+        )
 
     use_model = _STATE.model is not None and (force_model or not _STATE.supervisor.use_bootstrap_footholds())
     preds_b = _predict_footholds(env, use_model, bootstrap_footholds)

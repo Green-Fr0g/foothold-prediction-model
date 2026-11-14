@@ -30,3 +30,14 @@ class NormalizedFootPredictor(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model((x - self.in_mean) / self.in_std)
+
+
+def load_foot_predictor(path: str, input_size: int, device: str = "cpu") -> torch.jit.ScriptModule:
+    model = torch.jit.load(path, map_location=device).eval()
+    model_input_size = model.in_mean.numel()
+    if model_input_size != input_size:
+        raise ValueError(
+            f"FPM checkpoint '{path}' expects {model_input_size} state values, but this robot requires {input_size}. "
+            "Use an FPM trained for the selected robot."
+        )
+    return model

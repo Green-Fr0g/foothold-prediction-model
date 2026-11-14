@@ -6,8 +6,10 @@ import sys
 from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--task", type=str, default="FPM-G1-Play-v0")
-parser.add_argument("--checkpoint", type=str, default=None, help="Defaults to the latest run in logs/, else the demo policy.")
+parser.add_argument("--task", type=str, default="FPM-G1-23-Play-v0")
+parser.add_argument(
+    "--checkpoint", type=str, default=None, help="Defaults to the latest run for the selected robot; demo is G1 (29 DoF) only."
+)
 parser.add_argument("--num_envs", type=int, default=None)
 parser.add_argument("--video", action="store_true")
 parser.add_argument("--video_length", type=int, default=500)
@@ -79,6 +81,8 @@ DEMO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 
 def latest_checkpoint(run_dir: str) -> str | None:
+    if not os.path.isdir(run_dir):
+        return None
     found = [(int(m.group(1)), f) for f in os.listdir(run_dir) if (m := re.match(r"^model_(\d+)\.pt$", f))]
     return os.path.join(run_dir, max(found)[1]) if found else None
 
@@ -91,7 +95,14 @@ def resolve_checkpoint(experiment_name: str) -> str:
         checkpoint = latest_checkpoint(run)
         if checkpoint:
             return checkpoint
-    return latest_checkpoint(DEMO_DIR)
+    if experiment_name == "g1_fpm":
+        checkpoint = latest_checkpoint(DEMO_DIR)
+        if checkpoint:
+            return checkpoint
+    raise FileNotFoundError(
+        f"No policy checkpoint found for {experiment_name}. Train this robot first or pass --checkpoint. "
+        "The bundled demo is for the 29-DoF G1."
+    )
 
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")

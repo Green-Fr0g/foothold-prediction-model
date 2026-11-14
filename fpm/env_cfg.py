@@ -1,5 +1,6 @@
 import math
 
+from isaaclab.assets import ArticulationCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -13,7 +14,7 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
 
 from . import mdp
-from .assets import G1_CFG
+from .assets import G1_23_CFG, G1_CFG
 from .terrains import (
     CORRIDOR_TERRAIN_NAMES,
     CORRIDOR_TERRAINS_CFG,
@@ -308,6 +309,7 @@ class CurriculumCfg:
 
 @configclass
 class FpmEnvCfg(LocomotionVelocityRoughEnvCfg):
+    robot_cfg: ArticulationCfg = G1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     observations: ObservationsCfg = ObservationsCfg()
     commands: CommandsCfg = CommandsCfg()
     rewards: RewardsCfg = RewardsCfg()
@@ -319,7 +321,7 @@ class FpmEnvCfg(LocomotionVelocityRoughEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         self.scene.num_envs = 8192
-        self.scene.robot = G1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = self.robot_cfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
         self.scene.height_scanner.pattern_cfg = patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.0])
         self.scene.terrain.terrain_generator = TRAINING_TERRAINS_CFG
@@ -442,3 +444,28 @@ class FpmCorridorValidationEnvCfg(FpmEnvCfg_PLAY):
         self.terminations.reached_goal = DoneTerm(
             func=mdp.displacement_from_origin, params={"distance": self.goal_distance}
         )
+
+
+@configclass
+class FpmG1_23EnvCfg(FpmEnvCfg):
+    robot_cfg: ArticulationCfg = G1_23_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+
+@configclass
+class FpmG1_23EnvCfg_PLAY(FpmEnvCfg_PLAY):
+    robot_cfg: ArticulationCfg = G1_23_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+
+@configclass
+class FpmG1_23LocomotionValidationEnvCfg(FpmLocomotionValidationEnvCfg):
+    robot_cfg: ArticulationCfg = G1_23_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+
+@configclass
+class FpmG1_23FootPredValidationEnvCfg(FpmFootPredValidationEnvCfg):
+    robot_cfg: ArticulationCfg = G1_23_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+
+@configclass
+class FpmG1_23CorridorValidationEnvCfg(FpmCorridorValidationEnvCfg):
+    robot_cfg: ArticulationCfg = G1_23_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")

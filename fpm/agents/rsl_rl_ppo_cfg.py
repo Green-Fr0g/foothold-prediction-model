@@ -41,3 +41,8 @@ class FpmPPORunnerCfg(RslRlOnPolicyRunnerCfg):
             use_data_augmentation=True, use_mirror_loss=False, data_augmentation_func=g1_symmetry_augmentation
         ),
     )
+
+
+@configclass
+class FpmG1_23PPORunnerCfg(FpmPPORunnerCfg):
+    experiment_name = "g1_23_fpm"

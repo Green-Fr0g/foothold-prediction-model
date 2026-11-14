@@ -6,7 +6,7 @@ import sys
 from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--task", type=str, default="FPM-G1-Validate-Corridor-v0")
+parser.add_argument("--task", type=str, default="FPM-G1-23-Validate-Corridor-v0")
 parser.add_argument("--checkpoint", type=str, required=True)
 parser.add_argument("--rounds", type=int, default=4, help="Episodes per robot.")
 parser.add_argument("--save_results", action="store_true")

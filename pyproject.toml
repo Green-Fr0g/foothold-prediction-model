@@ -14,4 +14,9 @@ dependencies = ["rsl-rl-lib==3.3.0"]
 include = ["fpm*"]
 
 [tool.setuptools.package-data]
-fpm = ["assets/data/G1/*.usd", "assets/data/G1/configuration/*.usd"]
+fpm = [
+    "assets/data/G1/*.usd",
+    "assets/data/G1/configuration/*.usd",
+    "assets/data/G1_23/*.usd",
+    "assets/data/G1_23/configuration/*.usd",
+]

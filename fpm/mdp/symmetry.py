@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import torch
@@ -9,30 +10,24 @@ from tensordict import TensorDict
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
-_JOINT_PAIRS = [
-    (0, 1, 1.0),
-    (3, 4, -1.0),
-    (6, 7, -1.0),
-    (9, 10, 1.0),
-    (11, 12, 1.0),
-    (13, 14, 1.0),
-    (15, 16, -1.0),
-    (17, 18, -1.0),
-    (19, 20, -1.0),
-    (21, 22, 1.0),
-    (23, 24, -1.0),
-    (25, 26, 1.0),
-    (27, 28, -1.0),
-]
-_JOINT_SINGLES = [(2, -1.0), (5, -1.0), (8, 1.0)]
-
-_JOINT_PERM = list(range(29))
-_JOINT_SIGN = [1.0] * 29
-for _a, _b, _s in _JOINT_PAIRS:
-    _JOINT_PERM[_a], _JOINT_PERM[_b] = _b, _a
-    _JOINT_SIGN[_a] = _JOINT_SIGN[_b] = _s
-for _i, _s in _JOINT_SINGLES:
-    _JOINT_SIGN[_i] = _s
+_JOINT_SIGNS = {
+    "hip_pitch_joint": 1.0,
+    "hip_roll_joint": -1.0,
+    "hip_yaw_joint": -1.0,
+    "knee_joint": 1.0,
+    "ankle_pitch_joint": 1.0,
+    "ankle_roll_joint": -1.0,
+    "shoulder_pitch_joint": 1.0,
+    "shoulder_roll_joint": -1.0,
+    "shoulder_yaw_joint": -1.0,
+    "elbow_joint": 1.0,
+    "wrist_roll_joint": -1.0,
+    "wrist_pitch_joint": 1.0,
+    "wrist_yaw_joint": -1.0,
+    "waist_yaw_joint": -1.0,
+    "waist_roll_joint": -1.0,
+    "waist_pitch_joint": 1.0,
+}
 
 _VECTOR_SIGNS = {
     "base_lin_vel": (1.0, -1.0, 1.0),
@@ -43,9 +38,31 @@ _VECTOR_SIGNS = {
 _JOINT_TERMS = ("joint_pos", "joint_vel", "actions")
 
 
-def mirror_joints(x: torch.Tensor) -> torch.Tensor:
-    sign = torch.tensor(_JOINT_SIGN, device=x.device, dtype=x.dtype)
-    return x[..., _JOINT_PERM] * sign
+@lru_cache(maxsize=8)
+def _joint_mirror_map(joint_names: tuple[str, ...]) -> tuple[tuple[int, ...], tuple[float, ...]]:
+    indices = {name: i for i, name in enumerate(joint_names)}
+    permutation, signs = [], []
+    for name in joint_names:
+        if name.startswith("left_"):
+            kind, counterpart = name[5:], "right_" + name[5:]
+        elif name.startswith("right_"):
+            kind, counterpart = name[6:], "left_" + name[6:]
+        else:
+            kind, counterpart = name, name
+        if kind not in _JOINT_SIGNS or counterpart not in indices:
+            raise ValueError(f"No G1 mirror rule or matching joint for '{name}'.")
+        permutation.append(indices[counterpart])
+        signs.append(_JOINT_SIGNS[kind])
+    return tuple(permutation), tuple(signs)
+
+
+def mirror_joints(x: torch.Tensor, joint_names: list[str] | tuple[str, ...]) -> torch.Tensor:
+    """Mirror G1 joint values in their actual observation/action order (23 or 29 DoF)."""
+    if x.shape[-1] != len(joint_names):
+        raise ValueError(f"Expected {len(joint_names)} joint values, got {x.shape[-1]}.")
+    permutation, signs = _joint_mirror_map(tuple(joint_names))
+    sign = torch.tensor(signs, device=x.device, dtype=x.dtype)
+    return x[..., list(permutation)] * sign
 
 
 def _mirror_height_scan(x: torch.Tensor, env: ManagerBasedRLEnv, term_cfg) -> torch.Tensor:
@@ -79,7 +96,7 @@ def _mirror_group(env: ManagerBasedRLEnv, obs: torch.Tensor, group: str) -> torc
         if name in _VECTOR_SIGNS:
             out[:, idx : idx + dim] = seg * torch.tensor(_VECTOR_SIGNS[name], device=obs.device)
         elif name in _JOINT_TERMS:
-            out[:, idx : idx + dim] = mirror_joints(seg)
+            out[:, idx : idx + dim] = mirror_joints(seg, env.scene["robot"].joint_names)
         elif name == "height_scan":
             out[:, idx : idx + dim] = _mirror_height_scan(seg, env, getattr(group_cfg, name))
         elif name == "foothold_scan":
@@ -94,7 +111,9 @@ def g1_symmetry_augmentation(
     env, obs: TensorDict | None, actions: torch.Tensor | None = None
 ) -> tuple[TensorDict | None, torch.Tensor | None]:
     env = env.unwrapped
-    actions_aug = None if actions is None else torch.cat([actions, mirror_joints(actions)], dim=0)
+    actions_aug = (
+        None if actions is None else torch.cat([actions, mirror_joints(actions, env.scene["robot"].joint_names)], dim=0)
+    )
     if obs is None:
         return None, actions_aug
     batch = obs.batch_size[0]
